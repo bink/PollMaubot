@@ -52,7 +52,7 @@ class Poll:
 
 
 class PollPlugin(Plugin):
-    currentPoll = Poll("None", ["None"])
+    currentPolls = {}
 
     @command.new("poll", help="Make a poll")
     async def poll(self) -> None:
@@ -75,7 +75,7 @@ class PollPlugin(Plugin):
         if len(choices) <= 1:
             response = "You need to enter at least 2 choices."
         else:
-            self.currentPoll = Poll(question, choices)
+            self.currentPolls[evt.room_id] = Poll(question, choices)
             # Show users active poll
             choice_list = "<br />".join(
                 [f"{i+1}. {choice}" for i, choice in enumerate(choices)]
@@ -91,25 +91,25 @@ class PollPlugin(Plugin):
     async def handler(self, evt: MessageEvent, choice: int) -> None:
         await evt.mark_read()
         # Verify the user is able to vote
-        if self.currentPoll.hasVoted(evt.sender):
+        if self.currentPolls[evt.room_id].hasVoted(evt.sender):
             await evt.reply("You've already voted in this poll")
-        elif not self.currentPoll.isActive():
+        elif not self.currentPolls[evt.room_id].isActive():
             await evt.reply("I'm sorry this poll has already ended")
         else:
             # Checks if user entered a valid vote
-            if self.currentPoll.isAvailable(int(choice)):
+            if self.currentPolls[evt.room_id].isAvailable(int(choice)):
                 # Makes the vote
-                self.currentPoll.vote(int(choice), evt.sender)
+                self.currentPolls[evt.room_id].vote(int(choice), evt.sender)
             else:
                 await evt.reply("You must enter a valid choice")
 
     @poll.subcommand("results", help="Prints out the current results of the poll")
     async def handler(self, evt: MessageEvent) -> None:
         await evt.mark_read()
-        await evt.reply(self.currentPoll.get_results(), html_in_markdown=True)
+        await evt.reply(self.currentPolls[evt.room_id].get_results(), html_in_markdown=True)
 
     @poll.subcommand("close", help="Ends the poll")
     async def handler(self, evt: MessageEvent) -> None:
         await evt.mark_read()
-        self.currentPoll.close_poll()
+        self.currentPolls[evt.room_id].close_poll()
         await evt.reply("This poll is now over. Type !poll results to see the results.")
